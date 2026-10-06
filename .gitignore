@@ -3,3 +3,5 @@
 *.key
 *.key.pub
 run.sh
+*.pub
+config
