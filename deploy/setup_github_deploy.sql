@@ -17,6 +17,8 @@ GRANT DATABASE ROLE SNOWFLAKE.CORTEX_USER TO ROLE PDM_DEPLOYER;
 
 -- 2. Hand PDM_DB to the deploy role ----------------------------------------------------------
 -- CREATE OR REPLACE needs ownership of the existing object. Tasks must be SUSPENDED for this.
+-- Streamlit ownership can't be transferred ("Unsupported feature"): DROP the app instead and let the
+-- first deploy (script 09) recreate it under PDM_DEPLOYER.
 -- Each grant is tried on its own; the result lists OK / SKIP per statement.
 EXECUTE IMMEDIATE $$
 DECLARE
@@ -34,7 +36,6 @@ DECLARE
       'ALL PROCEDURES IN DATABASE PDM_DB',
       'ALL TASKS IN DATABASE PDM_DB',
       'ALL STAGES IN DATABASE PDM_DB',
-      'STREAMLIT PDM_DB.APP.PDM_COMMAND_CENTER',
       'ALL GIT REPOSITORIES IN DATABASE PDM_DB',
       'ALL CORTEX SEARCH SERVICES IN DATABASE PDM_DB',
       'ALL SEMANTIC VIEWS IN DATABASE PDM_DB',
