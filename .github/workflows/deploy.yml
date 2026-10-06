@@ -10,7 +10,7 @@ name: Deploy to Snowflake
 on:
   push:
     branches: [main]
-    paths: ['sql/**', 'streamlit/**', 'ci/**', '.github/workflows/deploy.yml']
+    paths: ['sql/**', 'streamlit/**', 'ci/**', 'deploy/public_demo_grants.sql', '.github/workflows/deploy.yml']
   workflow_dispatch:
     inputs:
       scripts:
@@ -99,6 +99,12 @@ jobs:
         # 09 recreates the Streamlit app, which drops its grants
         if: contains(steps.pick.outputs.files, '09_streamlit')
         run: snow sql -x -q "GRANT USAGE ON STREAMLIT PDM_DB.APP.PDM_COMMAND_CENTER TO ROLE PDM_JUDGE"
+
+      - name: Keep public demo access
+        # Scripts recreate objects, which drops grants. Set repo variable PUBLIC_DEMO=true after
+        # running deploy/setup_public_demo.sql.
+        if: vars.PUBLIC_DEMO == 'true'
+        run: snow sql -x -q "EXECUTE IMMEDIATE FROM ${REPO_STAGE}/commits/${GITHUB_SHA}/deploy/public_demo_grants.sql"
 
       - name: Resume scheduled tasks
         # Scripts 05/06 recreate the tasks SUSPENDED. Set repo variable RESUME_TASKS=true to keep them running.

@@ -2,10 +2,28 @@ import json
 
 import pandas as pd
 import streamlit as st
-from snowflake.snowpark.context import get_active_session
-
 st.set_page_config(page_title="PDM Command Center", layout="wide")
-session = get_active_session()
+
+
+@st.cache_resource
+def get_session():
+    """Inside Snowflake use the app's session; on Streamlit Community Cloud (public demo) log in
+    as the read-mostly PDM_PUBLIC_APP service user with the key pair from st.secrets["snowflake"]."""
+    try:
+        from snowflake.snowpark.context import get_active_session
+        return get_active_session()
+    except Exception:
+        pass
+    from cryptography.hazmat.primitives import serialization
+    from snowflake.snowpark import Session
+    cfg = dict(st.secrets["snowflake"])
+    key = serialization.load_pem_private_key(cfg.pop("private_key").encode(), password=None)
+    cfg["private_key"] = key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.PKCS8,
+                                           serialization.NoEncryption())
+    return Session.builder.configs(cfg).create()
+
+
+session = get_session()
 
 
 @st.cache_data(ttl=300)

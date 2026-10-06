@@ -5,3 +5,7 @@
 run.sh
 *.pub
 config
+
+# Streamlit Community Cloud secrets / private keys
+.streamlit/secrets.toml
+*.p8

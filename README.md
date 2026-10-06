@@ -40,6 +40,33 @@ Git is the source of truth and Snowflake runs the code from Git:
    component, and checks that the app exists. Run it by hand from the Actions tab (`all`, `none`, or e.g. `06 09`).
    Set the variable `RESUME_TASKS=true` to resume the scheduled tasks after each deploy.
 
+### Public demo (no Snowflake login)
+
+Streamlit in Snowflake always needs a Snowflake login. For a link anyone can open, the same
+`streamlit/streamlit_app.py` also runs on Streamlit Community Cloud. It detects that it's outside Snowflake and logs in as
+service user `PDM_PUBLIC_APP` (key pair), with role `PDM_PUBLIC_DEMO`:
+
+- **Allowed:** read the dashboards, create work orders through the guarded `CREATE_WORK_ORDER` procedure, chat with the agent.
+- **Not allowed:** `RESET_DEMO_DATA`, changing objects, anything outside `PDM_DB`.
+- **Cost cap:** its own `PDM_PUBLIC_WH` warehouse with a 3-credit daily resource monitor.
+
+Setup: run [`deploy/setup_public_demo.sql`](deploy/setup_public_demo.sql) with the public key, set the repo variable
+`PUBLIC_DEMO=true` so deploys keep the grants, then create the app on share.streamlit.io (main file
+`streamlit/streamlit_app.py`) with this secret:
+
+```toml
+[snowflake]
+account = "<org>-<account>"
+user = "PDM_PUBLIC_APP"
+role = "PDM_PUBLIC_DEMO"
+warehouse = "PDM_PUBLIC_WH"
+database = "PDM_DB"
+authenticator = "SNOWFLAKE_JWT"
+private_key = """-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----"""
+```
+
 ## Run from scratch
 
 ```bash

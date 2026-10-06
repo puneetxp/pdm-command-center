@@ -1,0 +1,6 @@
+# Streamlit Community Cloud (public demo of streamlit/streamlit_app.py).
+# Streamlit in Snowflake ignores this file and uses streamlit/environment.yml.
+streamlit>=1.35
+snowflake-snowpark-python>=1.20
+pandas
+cryptography
