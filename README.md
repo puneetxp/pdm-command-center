@@ -19,6 +19,27 @@ and raise OEE. Built end to end with Snowflake CoCo.
 | `sql/09_streamlit.sql` | Deploys `APP.PDM_COMMAND_CENTER` from the Git repo |
 | `streamlit/streamlit_app.py` | Command center: KPIs + alerts, machine drill-down + work-order form, agent chat, model accuracy |
 
+## Deploy
+
+[![Deploy to Snowflake](https://github.com/puneetxp/pdm-command-center/actions/workflows/deploy.yml/badge.svg)](https://github.com/puneetxp/pdm-command-center/actions/workflows/deploy.yml)
+
+**Live app:** see **Deployments → snowflake → View deployment** in the repo sidebar (Snowsight login required;
+viewers get the read-only `PDM_JUDGE` role).
+
+Git is the source of truth and Snowflake runs the code from Git:
+
+1. **New account, one shot:** run [`deploy/bootstrap.sql`](deploy/bootstrap.sql) as ACCOUNTADMIN. It creates the Git
+   integration and `PDM_DB.APP.PDM_REPO`, then runs `sql/01`–`09` from the repo.
+2. **Push-to-deploy (one-time setup):** run [`deploy/setup_github_deploy.sql`](deploy/setup_github_deploy.sql). It creates
+   the `PDM_DEPLOYER` role, the `GITHUB_DEPLOY` service user (GitHub OIDC workload identity, so no keys or
+   passwords are stored in GitHub) and the `PDM_JUDGE` viewer role. Copy the two values it prints into
+   GitHub → Settings → Secrets and variables → Actions → **Variables**: `SNOWFLAKE_ACCOUNT` and `SNOWFLAKE_APP_URL`.
+3. **Every push to `main`** ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)): Snowflake fetches the
+   commit, runs only the changed scripts among `sql/04`–`09` (a `streamlit/` change redeploys the app), then
+   [`ci/smoke_test.sql`](ci/smoke_test.sql) checks the pipeline, model and alerts, checks that the work-order guardrail rejects a bad
+   component, and checks that the app exists. Run it by hand from the Actions tab (`all`, `none`, or e.g. `06 09`).
+   Set the variable `RESUME_TASKS=true` to resume the scheduled tasks after each deploy.
+
 ## Run from scratch
 
 ```bash

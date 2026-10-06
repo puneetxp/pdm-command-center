@@ -1,0 +1,121 @@
+name: Deploy to Snowflake
+
+# Push to main -> Snowflake fetches this commit into PDM_DB.APP.PDM_REPO and runs the changed
+# scripts (sql/04-09) straight from Git, then smoke-tests the result.
+# Auth is GitHub OIDC -> Snowflake workload identity (service user GITHUB_DEPLOY): no keys or
+# passwords are stored in GitHub. One-time setup: deploy/setup_github_deploy.sql.
+# sql/01-03 (schemas, raw tables, synthetic data) are never run here: they drop/reset data.
+# Rebuild from scratch with deploy/bootstrap.sql instead.
+
+on:
+  push:
+    branches: [main]
+    paths: ['sql/**', 'streamlit/**', 'ci/**', '.github/workflows/deploy.yml']
+  workflow_dispatch:
+    inputs:
+      scripts:
+        description: 'Scripts to run: "all" (04-09), "none" (smoke test only), or numbers like "06 09"'
+        default: 'all'
+
+permissions:
+  id-token: write   # GitHub OIDC token for Snowflake
+  contents: read
+
+concurrency:
+  group: snowflake-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Skipped until the repo variable SNOWFLAKE_ACCOUNT is set (see deploy/setup_github_deploy.sql)
+    if: vars.SNOWFLAKE_ACCOUNT != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: snowflake
+      url: ${{ vars.SNOWFLAKE_APP_URL }}
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ vars.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_ROLE: PDM_DEPLOYER
+      SNOWFLAKE_WAREHOUSE: COMPUTE_WH
+      SNOWFLAKE_DATABASE: PDM_DB
+      REPO_STAGE: '@PDM_DB.APP.PDM_REPO'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Snowflake CLI
+        uses: snowflakedb/snowflake-cli-action@v2
+        with:
+          use-oidc: true
+
+      - name: Test connection
+        run: snow connection test -x
+
+      - name: Pick scripts to run
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_SCRIPTS: ${{ inputs.scripts }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            sel="$INPUT_SCRIPTS"
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            sel=all
+          else
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA")
+            sel=$(echo "$changed" | sed -nE 's#^sql/(0[4-9])_[^/]*\.sql$#\1#p' | tr '\n' ' ')
+            if echo "$changed" | grep -q '^streamlit/'; then sel="$sel 09"; fi
+          fi
+          [ "$sel" = "all" ] && sel="04 05 06 07 08 09"
+          [ "$sel" = "none" ] && sel=""
+          files=""
+          for n in $sel; do
+            if ! echo "$n" | grep -qE '^0[4-9]$'; then echo "::error::invalid script number '$n' (use 04-09)"; exit 1; fi
+            files="$files $(ls sql/${n}_*.sql)"
+          done
+          files=$(echo $files | tr ' ' '\n' | sort -u | tr '\n' ' ')
+          echo "Scripts: ${files:-<none>}"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch this commit into Snowflake
+        run: snow sql -x -q "ALTER GIT REPOSITORY PDM_DB.APP.PDM_REPO FETCH"
+
+      - name: Run scripts from Git
+        if: steps.pick.outputs.files != ''
+        env:
+          FILES: ${{ steps.pick.outputs.files }}
+        run: |
+          for f in $FILES; do
+            echo "::group::$f"
+            snow sql -x -q "EXECUTE IMMEDIATE FROM ${REPO_STAGE}/commits/${GITHUB_SHA}/${f}"
+            echo "::endgroup::"
+          done
+
+      - name: Resume scheduled tasks
+        # Scripts 05/06 recreate the tasks SUSPENDED. Set repo variable RESUME_TASKS=true to keep them running.
+        if: vars.RESUME_TASKS == 'true'
+        run: |
+          snow sql -x -q "ALTER TASK PDM_DB.APP.LIVE_FEED_TASK RESUME"
+          snow sql -x -q "ALTER TASK PDM_DB.APP.ALERTS_TASK RESUME"
+
+      - name: Smoke test - pipeline, model, alerts
+        run: |
+          snow sql -x -f ci/smoke_test.sql --format json > smoke.json
+          jq -r '.[] | "\(if .OK then "PASS" else "FAIL" end)  \(.CHECK_NAME) = \(.VAL)"' smoke.json
+          jq -e 'length > 0 and all(.[]; .OK == true)' smoke.json > /dev/null
+
+      - name: Smoke test - work-order guardrail rejects a wrong component
+        run: |
+          out=$(snow sql -x -q "CALL PDM_DB.APP.CREATE_WORK_ORDER_TOOL('M041', 'M044-PSU-A', 'P3', 'CI guardrail check - must be rejected', 'INSPECTION')" --format json)
+          echo "$out"
+          echo "$out" | grep -q 'does not belong to machine'
+
+      - name: Smoke test - Streamlit app exists
+        run: |
+          snow sql -x -q "SHOW STREAMLITS LIKE 'PDM_COMMAND_CENTER' IN SCHEMA PDM_DB.APP" --format json > app.json
+          jq -e 'length == 1' app.json > /dev/null
+          echo "App: ${{ vars.SNOWFLAKE_APP_URL }}"
