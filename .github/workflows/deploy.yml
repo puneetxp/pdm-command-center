@@ -95,6 +95,10 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Keep judge access to the app
+        # 09 recreates the Streamlit app, which drops its grants
+        run: snow sql -x -q "GRANT USAGE ON STREAMLIT PDM_DB.APP.PDM_COMMAND_CENTER TO ROLE PDM_JUDGE"
+
       - name: Resume scheduled tasks
         # Scripts 05/06 recreate the tasks SUSPENDED. Set repo variable RESUME_TASKS=true to keep them running.
         if: vars.RESUME_TASKS == 'true'
