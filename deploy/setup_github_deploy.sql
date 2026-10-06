@@ -62,7 +62,7 @@ CREATE USER IF NOT EXISTS GITHUB_DEPLOY
   WORKLOAD_IDENTITY = (
     TYPE = OIDC
     ISSUER = 'https://token.actions.githubusercontent.com'
-    SUBJECT = 'repo:puneetxp/pdm-command-center:environment:snowflake'
+    SUBJECT = 'repo:puneetxp@19248561/pdm-command-center@1407210438:environment:snowflake'  -- GitHub's ID-based subject (owner@id/repo@id)
   )
   DEFAULT_ROLE = PDM_DEPLOYER
   DEFAULT_WAREHOUSE = COMPUTE_WH
