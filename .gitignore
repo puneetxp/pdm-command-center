@@ -9,3 +9,4 @@ config
 # Streamlit Community Cloud secrets / private keys
 .streamlit/secrets.toml
 *.p8
+__pycache__/
