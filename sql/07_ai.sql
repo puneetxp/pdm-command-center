@@ -81,7 +81,7 @@ CREATE OR REPLACE SEMANTIC VIEW PDM_DB.APP.PDM_SEMANTIC_VIEW
     failures.failure_mode AS FAILURE_MODE
       COMMENT = 'MECHANICAL, MOISTURE, POWER_QUALITY, POWER_SHOCK, WIRING, REDUNDANCY_LOSS, OVERLOAD, RANDOM',
     failures.root_cause AS ROOT_CAUSE,
-    failures.component_id AS FAILED_COMPONENT_ID,
+    failures.failed_component_id AS COMPONENT_ID,
     work_orders.work_order_id AS WORK_ORDER_ID,
     work_orders.wo_type AS WO_TYPE COMMENT = 'CORRECTIVE, PREVENTIVE, PREDICTIVE, INSPECTION',
     work_orders.priority AS PRIORITY COMMENT = 'P1 urgent to P4',
