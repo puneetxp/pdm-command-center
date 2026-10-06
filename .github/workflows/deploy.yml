@@ -97,6 +97,7 @@ jobs:
 
       - name: Keep judge access to the app
         # 09 recreates the Streamlit app, which drops its grants
+        if: contains(steps.pick.outputs.files, '09_streamlit')
         run: snow sql -x -q "GRANT USAGE ON STREAMLIT PDM_DB.APP.PDM_COMMAND_CENTER TO ROLE PDM_JUDGE"
 
       - name: Resume scheduled tasks
