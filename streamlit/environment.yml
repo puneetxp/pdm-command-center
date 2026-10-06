@@ -1,0 +1,5 @@
+name: pdm_command_center
+channels:
+  - snowflake
+dependencies:
+  - pandas
