@@ -40,7 +40,7 @@ jobs:
       SNOWFLAKE_DATABASE: PDM_DB
       REPO_STAGE: '@PDM_DB.APP.PDM_REPO'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
